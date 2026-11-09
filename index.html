@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f5fd0">
+<title>Aniversário da Liv</title>
+<meta property="og:title" content="Aniversário da Liv">
+<meta property="og:description" content="Uma nova aventura começa. Quinta, 12 de novembro, 20h30, no Maré.">
+<meta property="og:image" content="capa.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<script>
+  // ⚠️ URL do Apps Script (a planilha onde as respostas chegam)
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvPSj7dPQiWwIUMXwiSnQul97TduKEweosrLYBfagE8fZ1EK9lsQgDfapMZ-OLca74/exec";
+</script>
+<style>
+  :root{
+    --noite:#1d1838; --crepusculo:#3b2f6b; --papel:#fff6e0; --tinta:#2b2242;
+    --rosa:#ef6f97; --rosa-escuro:#b8325a; --grama:#5fb34a; --ouro:#ffd34d; --lilas:#b9a9e8;
+    --px:4px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--noite); }
+  body{
+    font-family:'Pixelify Sans', ui-monospace, monospace; color:var(--tinta);
+    -webkit-font-smoothing:none; font-smooth:never;
+    display:flex; justify-content:center; align-items:center;
+    -webkit-tap-highlight-color:transparent; overscroll-behavior:none;
+  }
+
+  /* A "tela" do console: em celular ocupa tudo, no PC vira um aparelhinho */
+  #tela{
+    position:relative; width:100%; height:100dvh; max-width:460px; overflow:hidden;
+    background:var(--noite); image-rendering:pixelated;
+  }
+  @media (min-width:600px) and (min-height:700px){
+    #tela{ height:min(860px, 94dvh); box-shadow:0 0 0 6px #0f0c22, 0 0 0 12px #2e2752, 0 30px 60px rgba(0,0,0,.5); border-radius:6px; }
+  }
+
+  .cena{ position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; opacity:0; visibility:hidden; transition:opacity .35s steps(4), visibility 0s .35s; }
+  .cena.ativa{ opacity:1; visibility:visible; transition:opacity .35s steps(4); }
+
+  /* Caixa pixelada (cantos recortados, borda dupla de RPG) */
+  .caixa{
+    position:relative; background:var(--papel); margin:var(--px);
+    box-shadow:
+      0 calc(var(--px)*-1) 0 0 var(--tinta), 0 var(--px) 0 0 var(--tinta),
+      calc(var(--px)*-1) 0 0 0 var(--tinta), var(--px) 0 0 0 var(--tinta),
+      inset 0 0 0 3px #fff, inset 0 0 0 6px var(--lilas);
+  }
+
+  /* ---------- TÍTULO (desenhado em canvas, ver titulo.js) ---------- */
+  #jogo{ position:absolute; inset:0; z-index:0; width:100%; height:100%; image-rendering:pixelated; image-rendering:crisp-edges; cursor:pointer; touch-action:manipulation; }
+
+  #titulo{ pointer-events:none; }
+
+  /* ---------- MENUS (os "botões" do jogo) ---------- */
+  .menu{ list-style:none; margin:0; padding:14px 16px; }
+  .menu button{
+    all:unset; box-sizing:border-box; display:flex; align-items:center; gap:10px; width:100%;
+    font-family:'Pixelify Sans', monospace; font-size:24px; font-weight:500; color:var(--tinta);
+    padding:8px 6px 8px 8px; cursor:pointer; position:relative;
+  }
+  .menu button::before{ content:""; width:0; height:0; flex:none;
+    border-top:8px solid transparent; border-bottom:8px solid transparent; border-left:10px solid var(--tinta);
+    opacity:0; }
+  .menu button:focus::before{ opacity:1; animation:cutuca .5s steps(2) infinite; }
+  .menu button:focus-visible{ background:rgba(185,169,232,.35); }
+  @keyframes cutuca{ 50%{ transform:translateX(3px); } }
+  .menu .dica{ margin-left:auto; font-size:16px; color:#7b6f99; font-weight:400; }
+
+  /* ---------- DIÁLOGO ---------- */
+  .rodape{ margin-top:auto; padding:14px 10px calc(14px + env(safe-area-inset-bottom)); }
+  .rodape .fala{ min-height:200px; }
+  .fala{ padding:22px 20px 20px; min-height:150px; }
+  .quem{ position:absolute; top:-18px; left:16px; background:var(--rosa); color:#fff; font-family:'Silkscreen', monospace; font-size:14px; padding:4px 10px 3px;
+    box-shadow:0 -3px 0 var(--tinta), 0 3px 0 var(--tinta), -3px 0 0 var(--tinta), 3px 0 0 var(--tinta); }
+  .texto{ font-size:23px; line-height:1.3; margin:0; min-height:3.9em; white-space:pre-wrap; }
+  .proximo{ position:absolute; right:16px; bottom:12px; width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent;
+    border-top:10px solid var(--rosa); opacity:0; }
+  .proximo.on{ opacity:1; animation:quica .6s steps(2) infinite; }
+  @keyframes quica{ 50%{ transform:translateY(4px); } }
+  .toque{ position:absolute; inset:0; z-index:2; cursor:pointer; }
+  .escolhas{ margin-top:10px; }
+
+  /* ---------- NOME ---------- */
+  #nomeCena, #recadoCena{ background:rgba(13,22,64,.45); }
+  #nomeCena .conteudo{ flex:1; display:flex; flex-direction:column; justify-content:center; padding:24px 14px; gap:18px; }
+  .pergunta{ padding:22px 20px; }
+  .pergunta h2{ font-family:'Silkscreen', monospace; font-size:20px; margin:0 0 6px; color:var(--rosa-escuro); }
+  .pergunta p{ margin:0; font-size:21px; line-height:1.3; }
+  .campo{ margin-top:18px; position:relative; }
+  .campo input{
+    all:unset; box-sizing:border-box; width:100%; font-family:'Pixelify Sans', monospace; font-size:32px; font-weight:700;
+    letter-spacing:.06em; color:var(--tinta); padding:6px 4px 10px; caret-color:var(--rosa);
+    background-image:repeating-linear-gradient(90deg, var(--tinta) 0 22px, transparent 22px 28px);
+    background-size:100% 4px; background-repeat:no-repeat; background-position:bottom;
+  }
+  .campo input::placeholder{ color:#c5b9de; }
+  .contador{ text-align:right; font-size:16px; color:#7b6f99; margin-top:6px; }
+  .erro{ color:var(--rosa-escuro); font-size:18px; min-height:1.2em; margin-top:6px; }
+  textarea.recado{
+    all:unset; box-sizing:border-box; display:block; width:100%; margin-top:14px; min-height:96px;
+    font-family:'Pixelify Sans', monospace; font-size:21px; line-height:1.3; padding:10px 12px; background:#fff;
+    box-shadow:0 -3px 0 var(--tinta), 0 3px 0 var(--tinta), -3px 0 0 var(--tinta), 3px 0 0 var(--tinta);
+    white-space:pre-wrap;
+  }
+
+  /* ---------- MISSÃO (as informações) ---------- */
+  #missao{ background:linear-gradient(transparent 0 26dvh, rgba(13,22,64,.92) 34dvh); }
+  .faixa{ position:relative; height:24dvh; min-height:150px; flex:none; overflow:hidden; }
+  .faixa img{ width:100%; height:100%; object-fit:cover; object-position:47% 55%; display:block; image-rendering:pixelated; }
+  .faixa .selo{ position:absolute; left:12px; bottom:10px; font-family:'Silkscreen', monospace; font-size:13px; background:var(--ouro); color:var(--tinta); padding:4px 8px 3px;
+    box-shadow:0 -3px 0 var(--tinta), 0 3px 0 var(--tinta), -3px 0 0 var(--tinta), 3px 0 0 var(--tinta); }
+  #missao .rolagem{ flex:1; overflow:auto; padding:14px 10px calc(14px + env(safe-area-inset-bottom)); }
+  .ficha{ padding:20px 18px 14px; }
+  .ficha h2{ font-family:'Silkscreen', monospace; font-weight:700; font-size:22px; line-height:1.15; margin:0 0 4px; }
+  .ficha .para{ font-size:19px; color:#6d6189; margin:0 0 14px; }
+  .linha{ display:grid; grid-template-columns:36px 1fr; gap:12px; align-items:center; padding:10px 0; border-top:3px dotted #d9cdb0; }
+  .linha svg{ width:32px; height:32px; shape-rendering:crispEdges; }
+  .linha .rot{ display:block; font-size:16px; color:#7b6f99; }
+  .linha .val{ display:block; font-size:24px; font-weight:700; line-height:1.1; }
+  .linha a{ color:var(--rosa-escuro); font-size:18px; text-decoration-thickness:2px; text-underline-offset:3px; }
+  .status{ text-align:center; font-family:'Silkscreen', monospace; font-size:14px; color:var(--ouro); margin:14px 0 4px; }
+
+  /* ---------- FIM ---------- */
+  #fim{ background:rgba(13,22,64,.55); align-items:center; justify-content:center; text-align:center; padding:24px; }
+  #confete{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; image-rendering:pixelated; }
+  .nivel{ position:relative; z-index:1; width:100%; }
+  .nivel .grande{ font-family:'Silkscreen', monospace; font-weight:700; font-size:clamp(30px, 10vw, 44px); line-height:1; color:var(--ouro);
+    text-shadow:0 4px 0 #b8860b, 0 8px 0 #120e26; margin:0 0 22px; }
+  .nivel .caixa{ text-align:left; padding:20px 20px 10px; }
+  .nivel p{ font-size:22px; line-height:1.3; margin:0 0 10px; }
+
+  /* som */
+  #som{ all:unset; position:absolute; top:calc(10px + env(safe-area-inset-top)); right:10px; z-index:10; cursor:pointer;
+    font-family:'Silkscreen', monospace; font-size:12px; color:var(--papel); background:rgba(29,24,56,.7); padding:6px 8px; }
+  #som:focus-visible{ outline:3px solid var(--ouro); }
+
+  /* janela do convite */
+  #carta{ position:absolute; inset:0; z-index:20; background:rgba(13,22,64,.72); display:flex; align-items:center; justify-content:center; padding:16px 12px; }
+  .carta-caixa{ width:100%; max-height:100%; display:flex; flex-direction:column; padding:12px 12px 4px; animation:abreCarta .35s steps(5); }
+  .carta-caixa img{ display:block; width:100%; min-height:0; flex:1; object-fit:contain; image-rendering:auto; box-shadow:0 0 0 3px var(--tinta); }
+  .carta-caixa .menu{ padding:8px 4px 6px; }
+  .carta-caixa .menu button{ font-size:22px; padding:6px 6px 6px 8px; }
+  @keyframes abreCarta{ from{ transform:scale(.6); opacity:0; } }
+  .oculto{ display:none !important; }
+  .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="tela">
+  <canvas id="jogo" aria-label="Abertura do jogo Aniversário da Liv. Toque para começar." role="img"></canvas>
+  <button id="som" aria-pressed="true">SOM: ON</button>
+
+  <!-- 1. TÍTULO -->
+  <section class="cena ativa" id="titulo" aria-label="Tela de título">
+    <ul class="menu sr" id="menuTitulo" aria-label="Menu"></ul>
+  </section>
+
+  <!-- 2. DIÁLOGO -->
+  <section class="cena" id="dialogo" aria-label="Conversa">
+    <div class="rodape">
+      <div class="caixa fala">
+        <span class="quem">Liv</span>
+        <p class="texto" id="texto" aria-live="polite"></p>
+        <span class="proximo" id="proximo"></span>
+        <ul class="menu escolhas oculto" id="escolhas"></ul>
+        <div class="toque" id="toque" role="button" aria-label="Continuar"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. NOME -->
+  <section class="cena" id="nomeCena" aria-label="Seu nome">
+    <form class="conteudo" id="formNome" autocomplete="on">
+      <div class="caixa pergunta">
+        <h2>Novo jogo</h2>
+        <p>Como você se chama?</p>
+        <div class="campo">
+          <label class="sr" for="nome">Seu nome</label>
+          <input id="nome" name="nome" maxlength="16" autocomplete="given-name" placeholder="seu nome" enterkeyhint="done">
+        </div>
+        <div class="contador"><span id="conta">0</span>/16</div>
+        <div class="erro" id="erroNome"></div>
+      </div>
+      <div class="caixa"><ul class="menu"><li><button type="submit">Confirmar nome</button></li></ul></div>
+    </form>
+  </section>
+
+  <!-- 4. RECADO (opcional) -->
+  <section class="cena" id="recadoCena" aria-label="Recado">
+    <form class="conteudo" id="formRecado" style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:24px 14px;gap:18px;">
+      <div class="caixa pergunta">
+        <h2 id="recadoTitulo">Um recado?</h2>
+        <p id="recadoTexto">Se quiser, deixa uma mensagem pra Liv. Pode pular.</p>
+        <label class="sr" for="recado">Recado</label>
+        <textarea class="recado" id="recado" maxlength="300" placeholder="escreva aqui..."></textarea>
+        <div class="erro" id="erroEnvio"></div>
+      </div>
+      <div class="caixa"><ul class="menu">
+        <li><button type="submit" id="btnEnviar">Enviar resposta</button></li>
+        <li><button type="button" id="btnPular">Enviar sem recado</button></li>
+      </ul></div>
+    </form>
+  </section>
+
+  <!-- 5. MISSÃO -->
+  <section class="cena" id="missao" aria-label="Informações da festa">
+    <div class="faixa"><span class="selo">Nova missão</span></div>
+    <div class="rolagem">
+      <div class="caixa ficha">
+        <h2>Aniversário da Liv</h2>
+        <p class="para" id="paraQuem">Convite especial</p>
+        <div class="linha"><span id="icoData"></span><span><span class="rot">Quando</span><span class="val">Quinta, 12/11</span></span></div>
+        <div class="linha"><span id="icoHora"></span><span><span class="rot">Horário</span><span class="val">20h30</span></span></div>
+        <div class="linha"><span id="icoLocal"></span><span><span class="rot">Onde</span><span class="val">Maré, Vassouras</span>
+          <a href="https://www.google.com/maps/search/?api=1&query=Mar%C3%A9+Vassouras+RJ" target="_blank" rel="noopener">Abrir no mapa</a></span></div>
+      </div>
+      <div class="status oculto" id="statusMissao"></div>
+      <div class="caixa" style="margin-top:12px">
+        <ul class="menu" id="menuMissao"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. FIM -->
+  <section class="cena" id="fim" aria-label="Resposta enviada">
+    <canvas id="confete" width="120" height="216" aria-hidden="true"></canvas>
+    <div class="nivel">
+      <p class="grande" id="fimTitulo">Missão aceita!</p>
+      <div class="caixa">
+        <p id="fimTexto"></p>
+        <ul class="menu" id="menuFim" style="padding:6px 0 4px"></ul>
+      </div>
+    </div>
+  </section>
+  <!-- 7. CONVITE (a arte original) -->
+  <div id="carta" class="oculto" role="dialog" aria-modal="true" aria-label="Convite">
+    <div class="caixa carta-caixa">
+      <img src="convite-da-liv.jpg" alt="Convite: Aniversário da Liv. Local: Maré, Vassouras. Horário: 20h30. Data: 12/11." id="cartaImg">
+      <ul class="menu" id="menuCarta"></ul>
+    </div>
+  </div>
+</div>
+
+<script src="titulo.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const reduz = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const guarda = {
+    get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  };
+  const jogador = { nome:"", resposta:"", acompanhantes:0, ...(guarda.get("liv-save") || {}) };
+  const salvar = () => guarda.set("liv-save", jogador);
+
+  /* ===== SOM (bipes de videogame, gerados na hora) ===== */
+  let ctx = null, somOn = true;
+  function bip(freq = 660, dur = 0.05, tipo = "square", vol = 0.05){
+    if (!somOn) return;
+    try {
+      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = tipo; o.frequency.value = freq; g.gain.value = vol;
+      o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch(e){}
+  }
+  const jingle = notas => notas.forEach(([f, t, d], i) => setTimeout(() => bip(f, d || 0.12, "square", 0.06), t));
+  $("som").addEventListener("click", () => { somOn = !somOn; $("som").textContent = somOn ? "SOM: ON" : "SOM: OFF"; $("som").setAttribute("aria-pressed", somOn); });
+
+  /* ===== CENAS ===== */
+  let atual = "titulo";
+  function ir(id){
+    $(atual).classList.remove("ativa"); $(id).classList.add("ativa"); atual = id;
+    if (id !== "titulo" && window.tituloCena) window.tituloCena();
+    const foco = $(id).querySelector("input, textarea, .menu button");
+    if (foco && id !== "dialogo") setTimeout(() => foco.focus({ preventScroll:true }), 380);
+  }
+
+  /* ===== MENUS com setinha ===== */
+  function menu(ul, itens){
+    ul.innerHTML = "";
+    itens.forEach(([txt, fn, dica]) => {
+      const li = document.createElement("li"), b = document.createElement("button");
+      b.type = "button"; b.textContent = txt;
+      if (dica) { const s = document.createElement("span"); s.className = "dica"; s.textContent = dica; b.appendChild(s); }
+      b.addEventListener("mouseenter", () => b.focus({ preventScroll:true }));
+      b.addEventListener("focus", () => bip(880, .03));
+      b.addEventListener("click", e => { e.stopPropagation(); bip(1320, .07); fn(); });
+      li.appendChild(b); ul.appendChild(li);
+    });
+    ul.onkeydown = e => {
+      const bs = [...ul.querySelectorAll("button")], i = bs.indexOf(document.activeElement);
+      if (e.key === "ArrowDown"){ e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
+      if (e.key === "ArrowUp"){ e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
+    };
+  }
+
+  /* ===== DIÁLOGO com efeito de digitação ===== */
+  let fila = [], digitando = false, timer = null, aoFim = null, linhaAtual = "";
+  function dizer(linhas, depois){ fila = linhas.slice(); aoFim = depois; ir("dialogo"); proxima(); }
+  function proxima(){
+    $("escolhas").classList.add("oculto"); $("toque").classList.remove("oculto");
+    if (!fila.length){ const f = aoFim; aoFim = null; f && f(); return; }
+    const item = fila.shift();
+    linhaAtual = typeof item === "string" ? item : item.t;
+    const opcoes = typeof item === "string" ? null : item.opcoes;
+    $("proximo").classList.remove("on");
+    const el = $("texto"); el.textContent = ""; digitando = true; window.livFala = true; let i = 0;
+    clearInterval(timer);
+    const fimLinha = () => {
+      clearInterval(timer); digitando = false; window.livFala = false; el.textContent = linhaAtual;
+      if (opcoes){ $("toque").classList.add("oculto"); $("escolhas").classList.remove("oculto"); menu($("escolhas"), opcoes); setTimeout(() => $("escolhas").querySelector("button").focus(), 50); }
+      else $("proximo").classList.add("on");
+    };
+    if (reduz){ fimLinha(); return; }
+    timer = setInterval(() => {
+      el.textContent = linhaAtual.slice(0, ++i);
+      if (i % 2 && linhaAtual[i-1] !== " ") bip(520 + Math.random()*80, .025, "square", .03);
+      if (i >= linhaAtual.length) fimLinha();
+    }, 32);
+    $("toque").onclick = () => { if (digitando) fimLinha(); else { bip(990, .05); proxima(); } };
+  }
+  $("dialogo").addEventListener("click", e => {
+    if (e.target.closest("button") || e.target.id === "toque" || $("toque").classList.contains("oculto")) return;
+    $("toque").click();
+  });
+  document.addEventListener("keydown", e => {
+    if (atual === "dialogo" && !$("toque").classList.contains("oculto") && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); $("toque").click(); }
+  });
+
+  /* ===== FLUXO ===== */
+  const primeiro = () => jogador.nome.split(" ")[0];
+  function montarTitulo(){
+    if (jogador.nome){
+      menu($("menuTitulo"), [
+        ["Continuar", () => verMissao(), primeiro()],
+        ["Novo jogo", novoJogo]
+      ]);
+    } else {
+      menu($("menuTitulo"), [["Novo jogo", abertura]]);
+    }
+  }
+  function novoJogo(){ jogador.nome = ""; jogador.resposta = ""; jogador.acompanhantes = 0; salvar(); abertura(); }
+  function abertura(){
+    jingle([[523,0],[659,110],[784,220],[1047,330,.25]]);
+    dizer([
+      "Oi! Que bom que você chegou até aqui.",
+      "Tô fazendo aniversário e vou comemorar com uma aventura.",
+      "Mas antes de começar... preciso saber quem é você."
+    ], () => ir("nomeCena"));
+  }
+
+  const inputNome = $("nome");
+  inputNome.addEventListener("input", () => { $("conta").textContent = inputNome.value.length; bip(700, .02); });
+  $("formNome").addEventListener("submit", e => {
+    e.preventDefault();
+    const n = inputNome.value.trim().replace(/\s+/g, " ");
+    if (!n){ $("erroNome").textContent = "Digite seu nome para continuar."; bip(180, .15, "square", .05); return; }
+    $("erroNome").textContent = ""; inputNome.blur();
+    dizer([{ t: `${n}! É isso mesmo?`, opcoes: [
+      ["Isso!", () => { jogador.nome = n; salvar(); dizer([
+        `Prazer, ${n.split(" ")[0]}!`,
+        "Separei sua missão. Dá uma olhada nos detalhes."
+      ], verMissao); }],
+      ["Quero corrigir", () => ir("nomeCena")]
+    ]}]);
+  });
+
+  /* ícones em pixel (8x8) */
+  const icone = (grade, cores) => {
+    const linhas = grade.trim().split("\n").map(l => l.trim());
+    let r = "";
+    linhas.forEach((l, y) => [...l].forEach((c, x) => { if (cores[c]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${cores[c]}"/>`; }));
+    return `<svg viewBox="0 0 ${linhas[0].length} ${linhas.length}" aria-hidden="true">${r}</svg>`;
+  };
+  const T = "#2b2242", R = "#ef6f97", W = "#ffffff", G = "#ffd34d";
+  $("icoData").innerHTML = icone(`
+    .t....t.
+    tttttttt
+    tRRRRRRt
+    tttttttt
+    tWtWtWWt
+    tttWtWtt
+    tWtWtWWt
+    tttttttt`, { t:T, R:R, W:W });
+  $("icoHora").innerHTML = icone(`
+    ..tttt..
+    .tWWWWt.
+    tWWtWWWt
+    tWWtWWWt
+    tWWtttWt
+    tWWWWWWt
+    .tWWWWt.
+    ..tttt..`, { t:T, W:W });
+  $("icoLocal").innerHTML = icone(`
+    ..tttt..
+    .tRRRRt.
+    tRRWWRRt
+    tRRWWRRt
+    .tRRRRt.
+    ..tRRt..
+    ...tt...
+    ..GGGG..`, { t:T, R:R, W:W, G:G });
+
+  function verMissao(){
+    $("paraQuem").textContent = `Convite para ${jogador.nome}`;
+    const st = $("statusMissao");
+    if (jogador.resposta === "sim"){ st.textContent = `Você aceitou${jogador.acompanhantes ? ` e vai com +${jogador.acompanhantes}` : ""}`; st.classList.remove("oculto"); }
+    else if (jogador.resposta === "nao"){ st.textContent = "Você avisou que não vai"; st.classList.remove("oculto"); }
+    else st.classList.add("oculto");
+    menu($("menuMissao"), jogador.resposta ? [
+      ["Ver convite", abrirCarta],
+      ["Adicionar à agenda", agenda],
+      ["Mudar resposta", perguntar]
+    ] : [
+      ["Aceitar missão", aceitar],
+      ["Não vou poder", recusar],
+      ["Ver convite", abrirCarta]
+    ]);
+    ir("missao");
+  }
+  function perguntar(){
+    menu($("menuMissao"), [["Aceitar missão", aceitar], ["Não vou poder", recusar]]);
+    $("menuMissao").querySelector("button").focus();
+  }
+  function aceitar(){
+    jogador.resposta = "sim";
+    dizer([{ t: "Eba! Vai levar alguém com você?", opcoes: [
+      ["Vou sozinho(a)", () => companhia(0)],
+      ["Levo +1", () => companhia(1)],
+      ["Levo +2", () => companhia(2)],
+      ["Levo +3", () => companhia(3)]
+    ]}]);
+  }
+  function companhia(n){
+    jogador.acompanhantes = n;
+    $("recadoTitulo").textContent = "Um recado?";
+    $("recadoTexto").textContent = "Se quiser, deixa uma mensagem pra Liv. Pode pular.";
+    ir("recadoCena");
+  }
+  function recusar(){
+    jogador.resposta = "nao"; jogador.acompanhantes = 0;
+    dizer(["Ah, que pena...", "Tudo bem! Se quiser, me manda um recadinho."], () => {
+      $("recadoTitulo").textContent = "Um recado?";
+      $("recadoTexto").textContent = "Escreve algo pra Liv, se quiser. Pode pular.";
+      ir("recadoCena");
+    });
+  }
+
+  async function enviar(comRecado){
+    const btn = $("btnEnviar"), erro = $("erroEnvio");
+    erro.textContent = "";
+    if (!SCRIPT_URL || SCRIPT_URL.startsWith("COLE_AQUI")){ erro.textContent = "As respostas ainda não estão ligadas. Avise a Liv."; return; }
+    const dados = { nome: jogador.nome, resposta: jogador.resposta, acompanhantes: jogador.acompanhantes, recado: comRecado ? $("recado").value.trim() : "" };
+    btn.textContent = "Enviando..."; btn.disabled = true;
+    try {
+      await fetch(SCRIPT_URL, { method:"POST", mode:"no-cors", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(dados) });
+      salvar(); $("recado").value = ""; final();
+    } catch(e){
+      erro.textContent = "Não foi enviado. Confira sua internet e tente de novo.";
+    } finally { btn.textContent = "Enviar resposta"; btn.disabled = false; }
+  }
+  $("formRecado").addEventListener("submit", e => { e.preventDefault(); bip(1320, .07); enviar(true); });
+  $("btnPular").addEventListener("click", () => { bip(1320, .07); enviar(false); });
+
+  function final(){
+    if (jogador.resposta === "sim"){
+      $("fimTitulo").textContent = "Missão aceita!";
+      $("fimTexto").textContent = `${primeiro()} entrou para o grupo${jogador.acompanhantes ? ` (+${jogador.acompanhantes})` : ""}. Te vejo quinta, às 20h30, no Maré!`;
+      menu($("menuFim"), [["Ver convite", abrirCarta], ["Adicionar à agenda", agenda], ["Ver detalhes", verMissao]]);
+      jingle([[523,0,.1],[523,110,.1],[523,220,.1],[659,330,.3],[784,560,.12],[1047,680,.4]]);
+      confete(); window.tituloFesta && window.tituloFesta();
+      setTimeout(() => { if (atual === "fim" && $("carta").classList.contains("oculto")) abrirCarta(); }, 2800);
+    } else {
+      $("fimTitulo").textContent = "Resposta enviada";
+      $("fimTexto").textContent = `Valeu por avisar, ${primeiro()}. Fica pra próxima!`;
+      menu($("menuFim"), [["Ver convite", abrirCarta], ["Ver detalhes", verMissao]]);
+      jingle([[659,0],[523,140],[392,280,.3]]);
+    }
+    ir("fim");
+  }
+
+  let voltarFoco = null;
+  function abrirCarta(){
+    voltarFoco = document.activeElement;
+    jingle([[784,0,.08],[988,80,.08],[1175,160,.2]]);
+    $("carta").classList.remove("oculto");
+    menu($("menuCarta"), [["Baixar convite", baixarConvite], ["Fechar", fecharCarta]]);
+    setTimeout(() => $("menuCarta").querySelector("button").focus(), 50);
+  }
+  function fecharCarta(){ $("carta").classList.add("oculto"); voltarFoco && voltarFoco.focus && voltarFoco.focus(); }
+  function baixarConvite(){
+    const a = document.createElement("a");
+    a.href = "convite-da-liv.jpg"; a.download = "convite-aniversario-da-liv.jpg";
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  $("carta").addEventListener("click", e => { if (e.target.id === "carta") fecharCarta(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("carta").classList.contains("oculto")) fecharCarta(); });
+
+  function agenda(){
+    const ics = [
+      "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Liv//Aniversario//PT","BEGIN:VEVENT",
+      "UID:aniversario-liv-2026@liv","DTSTAMP:20261108T000000Z",
+      "DTSTART:20261112T233000Z","DTEND:20261113T033000Z",
+      "SUMMARY:Aniversário da Liv","LOCATION:Maré\\, Vassouras - RJ",
+      "END:VEVENT","END:VCALENDAR"
+    ].join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([ics], { type:"text/calendar" }));
+    a.download = "aniversario-da-liv.ics"; document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  /* ===== CONFETE ===== */
+  function confete(){
+    const cv = $("confete"), g = cv.getContext("2d"), cores = ["#ef6f97","#ffd34d","#5fb34a","#b9a9e8","#ffffff"];
+    if (reduz) return;
+    const ps = Array.from({length:70}, () => ({ x:cv.width/2, y:cv.height*.35, vx:(Math.random()-.5)*3, vy:-Math.random()*3-1, c:cores[Math.random()*cores.length|0] }));
+    let f = 0;
+    (function anima(){
+      g.clearRect(0,0,cv.width,cv.height);
+      ps.forEach(p => { p.vy += .06; p.x += p.vx; p.y += p.vy; g.fillStyle = p.c; g.fillRect(p.x|0, p.y|0, 2, 2); });
+      if (++f < 220) requestAnimationFrame(anima); else g.clearRect(0,0,cv.width,cv.height);
+    })();
+  }
+
+  /* começar com qualquer toque na tela de título */
+  montarTitulo();
+  window.iniciarTitulo({
+    itens: () => jogador.nome
+      ? [["CONTINUAR", () => verMissao()], ["NOVO JOGO", novoJogo]]
+      : [["NOVO JOGO", abertura]],
+    bip, jingle
+  });
+})();
+</script>
+</body>
+</html>
